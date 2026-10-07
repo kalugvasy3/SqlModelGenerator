@@ -41,8 +41,10 @@ public static class SqlTypeMapper
             _ => "string"
         };
 
+        // The generated code targets C# 7.3 on .NET Framework 4.8. Nullable
+        // reference annotations require C# 8 and are not needed at runtime.
         if (baseType is "string" or "byte[]" or "object")
-            return isNullable ? baseType + "?" : baseType;
+            return baseType;
 
         return isNullable ? baseType + "?" : baseType;
     }

@@ -6,111 +6,78 @@ public sealed class DbContextGenerator
 {
     private readonly CodeGeneratorOptions _options;
 
-    public DbContextGenerator(CodeGeneratorOptions options)
-    {
-        _options = options;
-    }
+    public DbContextGenerator(CodeGeneratorOptions options) => _options = options;
 
     public void Generate(DatabaseModel model)
     {
-        var path = Path.Combine(_options.OutputRoot, _options.DbContextName + ".g.cs");
         var w = new CodeWriter();
-
-        w.WriteLine("using Microsoft.EntityFrameworkCore;");
+        w.WriteLine("using System;");
+        w.WriteLine("using System.Collections.Generic;");
+        w.WriteLine("using System.ComponentModel.DataAnnotations.Schema;");
+        w.WriteLine("using System.Data.Entity;");
+        w.WriteLine("using System.Threading;");
+        w.WriteLine("using System.Threading.Tasks;");
         w.WriteLine($"using {_options.RootNamespace}.Entities;");
         w.WriteLine($"using {_options.RootNamespace}.Views;");
-        w.WriteLine($"using {_options.RootNamespace}.Procedures;");
         w.WriteLine();
-        w.WriteLine($"namespace {_options.RootNamespace};");
-        w.WriteLine();
+        w.WriteLine($"namespace {_options.RootNamespace}");
+        w.OpenBlock();
         w.WriteLine($"public partial class {_options.DbContextName} : DbContext");
         w.OpenBlock();
-        w.WriteLine($"public {_options.DbContextName}(DbContextOptions<{_options.DbContextName}> options) : base(options)");
+        w.WriteLine($"static {_options.DbContextName}()");
         w.OpenBlock();
+        w.WriteLine($"System.Data.Entity.Database.SetInitializer<{_options.DbContextName}>(null);");
         w.CloseBlock();
         w.WriteLine();
+        w.WriteLine($"public {_options.DbContextName}() : base(\"name={_options.DbContextName}\") {{ }}");
+        w.WriteLine($"public {_options.DbContextName}(string connectionStringOrName) : base(connectionStringOrName) {{ }}");
+        w.WriteLine();
 
-        foreach (var table in model.Tables.OrderBy(x => x.ClassName))
-            w.WriteLine($"public DbSet<{table.ClassName}> {table.ClassName}s => Set<{table.ClassName}>();");
+        foreach (var table in model.Tables.Where(t => t.PrimaryKeyColumns.Count > 0).OrderBy(t => t.ClassName))
+            w.WriteLine($"public DbSet<{table.ClassName}> {table.ClassName}s {{ get; set; }}");
 
-        foreach (var view in model.Views.OrderBy(x => x.ClassName))
-            w.WriteLine($"public DbSet<{view.ClassName}> {view.ClassName}s => Set<{view.ClassName}>();");
-
-        foreach (var proc in model.Procedures.Where(x => x.HasResultSet).OrderBy(x => x.ResultClassName))
-            w.WriteLine($"public DbSet<{proc.ResultClassName}> {proc.ResultClassName}s => Set<{proc.ResultClassName}>();");
+        foreach (var view in model.Views.OrderBy(v => v.ClassName))
+        {
+            var columns = view.Columns.OrderBy(c => c.Ordinal)
+                .Select(c => $"{SqlIdentifier(c.Name)} AS {SqlIdentifier(c.PropertyName.TrimStart('@'))}");
+            var sql = $"SELECT {string.Join(", ", columns)} FROM {SqlIdentifier(view.Schema)}.{SqlIdentifier(view.Name)}";
+            w.WriteLine();
+            w.WriteLine($"public Task<List<Views.{view.ClassName}>> Get{view.ClassName}ViewAsync(CancellationToken cancellationToken = default(CancellationToken))");
+            w.OpenBlock();
+            w.WriteLine($"return Database.SqlQuery<Views.{view.ClassName}>(\"{CSharpString(sql)}\").ToListAsync(cancellationToken);");
+            w.CloseBlock();
+        }
 
         w.WriteLine();
-        w.WriteLine("protected override void OnModelCreating(ModelBuilder modelBuilder)");
+        w.WriteLine("protected override void OnModelCreating(DbModelBuilder modelBuilder)");
         w.OpenBlock();
-
-        foreach (var table in model.Tables.OrderBy(x => x.ClassName))
+        foreach (var table in model.Tables.Where(t => t.PrimaryKeyColumns.Count > 0).OrderBy(t => t.ClassName))
         {
-            w.WriteLine($"modelBuilder.Entity<{table.ClassName}>(entity =>");
-            w.OpenBlock();
-            w.WriteLine($"entity.ToTable(\"{table.Name}\", \"{table.Schema}\");");
-
-            if (table.PrimaryKeyColumns.Count > 0)
+            w.WriteLine($"modelBuilder.Entity<{table.ClassName}>()");
+            w.WriteLine($"    .ToTable(\"{CSharpString(table.Name)}\", \"{CSharpString(table.Schema)}\");");
+            var keys = table.PrimaryKeyColumns.Select(name => table.Columns.First(c => c.Name == name).PropertyName).ToArray();
+            var key = keys.Length == 1 ? $"e.{keys[0]}" : $"new {{ {string.Join(", ", keys.Select(k => "e." + k))} }}";
+            w.WriteLine($"modelBuilder.Entity<{table.ClassName}>().HasKey(e => {key});");
+            foreach (var column in table.Columns.OrderBy(c => c.Ordinal))
             {
-                if (table.PrimaryKeyColumns.Count == 1)
+                var property = $"modelBuilder.Entity<{table.ClassName}>().Property(e => e.{column.PropertyName})";
+                w.WriteLine($"{property}.HasColumnName(\"{CSharpString(column.Name)}\");");
+                if (!column.IsNullable && (column.ClrTypeName is "string" or "byte[]"))
+                    w.WriteLine($"{property}.IsRequired();");
+                if (column.IsIdentity || column.IsComputed)
                 {
-                    var prop = table.Columns.First(x => x.Name == table.PrimaryKeyColumns[0]).PropertyName;
-                    w.WriteLine($"entity.HasKey(e => e.{prop});");
-                }
-                else
-                {
-                    var props = table.Columns
-                        .Where(c => table.PrimaryKeyColumns.Contains(c.Name, StringComparer.OrdinalIgnoreCase))
-                        .OrderBy(c => c.Ordinal)
-                        .Select(c => "e." + c.PropertyName);
-                    w.WriteLine($"entity.HasKey(e => new {{ {string.Join(", ", props)} }});");
+                    var option = column.IsIdentity ? "Identity" : "Computed";
+                    w.WriteLine($"{property}.HasDatabaseGeneratedOption(DatabaseGeneratedOption.{option});");
                 }
             }
-            else
-            {
-                w.WriteLine("entity.HasNoKey();");
-            }
-
-            foreach (var column in table.Columns.OrderBy(x => x.Ordinal))
-            {
-                w.WriteLine($"entity.Property(e => e.{column.PropertyName}).HasColumnName(\"{column.Name}\");");
-            }
-
-            w.CloseBlock(");");
-            w.WriteLine();
         }
-
-        foreach (var view in model.Views.OrderBy(x => x.ClassName))
-        {
-            w.WriteLine($"modelBuilder.Entity<{view.ClassName}>(entity =>");
-            w.OpenBlock();
-            w.WriteLine("entity.HasNoKey();");
-            w.WriteLine($"entity.ToView(\"{view.Name}\", \"{view.Schema}\");");
-            foreach (var column in view.Columns.OrderBy(x => x.Ordinal))
-            {
-                w.WriteLine($"entity.Property(e => e.{column.PropertyName}).HasColumnName(\"{column.Name}\");");
-            }
-            w.CloseBlock(");");
-            w.WriteLine();
-        }
-
-        foreach (var proc in model.Procedures.Where(x => x.HasResultSet).OrderBy(x => x.ResultClassName))
-        {
-            w.WriteLine($"modelBuilder.Entity<{proc.ResultClassName}>(entity =>");
-            w.OpenBlock();
-            w.WriteLine("entity.HasNoKey();");
-            w.WriteLine("entity.ToView(null);");
-            foreach (var column in proc.ResultColumns.OrderBy(x => x.Ordinal))
-            {
-                w.WriteLine($"entity.Property(e => e.{column.PropertyName}).HasColumnName(\"{column.Name}\");");
-            }
-            w.CloseBlock(");");
-            w.WriteLine();
-        }
-
         w.WriteLine("base.OnModelCreating(modelBuilder);");
         w.CloseBlock();
         w.CloseBlock();
-
-        File.WriteAllText(path, w.ToString());
+        w.CloseBlock();
+        File.WriteAllText(Path.Combine(_options.OutputRoot, _options.DbContextName + ".g.cs"), w.ToString());
     }
+
+    private static string SqlIdentifier(string name) => "[" + name.Replace("]", "]]") + "]";
+    private static string CSharpString(string value) => value.Replace("\\", "\\\\").Replace("\"", "\\\"");
 }

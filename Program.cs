@@ -25,11 +25,13 @@ internal static class Program
     {
         try
         {
-            var outputRoot = Path.Combine(AppContext.BaseDirectory, "Generated");
+            var outputRoot = Environment.GetEnvironmentVariable("SQLMODELGENERATOR_OUTPUT")
+                ?? Path.Combine(AppContext.BaseDirectory, "Generated");
             Directory.CreateDirectory(outputRoot);
 
             Console.WriteLine("Reading SQL Server metadata...");
-            var reader = new DatabaseReader(ConnectionString);
+            var reader = new DatabaseReader(
+                Environment.GetEnvironmentVariable("SQLMODELGENERATOR_CONNECTION_STRING") ?? ConnectionString);
             var model = await reader.ReadAsync();
 
             Console.WriteLine($"Tables     : {model.Tables.Count}");

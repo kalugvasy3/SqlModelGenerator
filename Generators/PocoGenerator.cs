@@ -40,7 +40,8 @@ public sealed class PocoGenerator
         var w = new CodeWriter();
         w.WriteLine("using System;");
         w.WriteLine();
-        w.WriteLine($"namespace {ns};");
+        w.WriteLine($"namespace {ns}");
+        w.OpenBlock();
         w.WriteLine();
         w.WriteLine($"public partial class {className}");
         w.OpenBlock();
@@ -51,6 +52,7 @@ public sealed class PocoGenerator
             w.WriteLine($"public {column.ClrTypeName} {column.PropertyName} {{ get; set; }}");
         }
 
+        w.CloseBlock();
         w.CloseBlock();
         return w.ToString();
     }
