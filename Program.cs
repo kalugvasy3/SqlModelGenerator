@@ -4,12 +4,12 @@ namespace SqlModelGenerator;
 
 internal static class Program
 {
-    // ==================== ВХОДНЫЕ ПАРАМЕТРЫ ====================
-    // Все настройки генерации находятся здесь. Аргументы командной строки
-    // и переменные окружения не переопределяют этот блок.
+    // ==================== INPUT PARAMETERS ====================
+    // All generation settings are located here. Command-line arguments
+    // and environment variables do not override this block. 
 
-    // Подключение SQL Server для чтения схемы. Существующее значение сохранено.
-    // Генератор не выполняет процедуры и не изменяет данные в базе.
+    // SQL Server connection for reading the schema. The existing value has been preserved. 
+    // The generator does not execute procedures or modify data in the database.
     private const string ConnectionString = @"
             Data Source=localhost;
             Initial Catalog = OregonLC; 
@@ -19,15 +19,15 @@ internal static class Program
             Integrated Security = True;
             Transaction Binding = Explicit Unbind;";
 
-    // Отдельная папка для результата. При необходимости замените на полный путь.
-    // Существующую модель из проекта сюда не помещайте: для неё есть поле ниже.
+    // A separate folder for the result. Replace with a full path if necessary. 
+    // Do not place an existing model from the project here; there is a field below for that.
     private static readonly string OutputFolder = Path.Combine(AppContext.BaseDirectory, "Generated");
 
-    // Имена namespace и DbContext в генерируемом C#-коде EF6.
+    // Namespace and DbContext names in the generated EF6 C# code.
     private const string RootNamespace = "GeneratedModel";
     private const string ContextName = "AppDbContext";
 
-    // Тайм-аут каждого запроса метаданных, в секундах. Пустой фильтр = все схемы.
+    // Timeout for each metadata request, in seconds. Empty filter = all schemas.
     private const int MetadataTimeoutSeconds = 120;
     private const string SchemaFilter = "";
     private const bool IncludeTables = true;
@@ -36,31 +36,31 @@ internal static class Program
     // FK и связи читаются всегда для выбранных таблиц.
 
     // Singular: Clients -> Client; Plural: Client -> Clients.
-    // AsInDatabase сохраняет имя из базы. Для .NET Framework/C# 7.3 nullable
-    // reference types должны быть выключены; nullable value types сохраняются.
+    // AsInDatabase preserves the name as it appears in the database. For .NET Framework/C# 7.3,
+    // nullable reference types must be disabled; nullable value types are preserved.
     private const NamingStyle ClassNaming = NamingStyle.Singular;
     private const NamingStyle SetNaming = NamingStyle.Plural;
     private const bool NullableReferenceTypes = false;
 
-    // Необязательно: папка/проект существующей модели EF6 (например, Миссури).
-    // Если путь указан, сохраняются существующие имена, интерфейсы, методы,
-    // навигации и контракты процедур. Исходная модель остаётся входным образцом.
+    // Optional: folder/project of an existing EF6 model (e.g., Missouri). 
+    // If a path is provided, existing names, interfaces, methods,
+    // navigation properties, and procedure contracts are preserved. The original model remains the input template.
     private const string ExistingModelPath = "";
 
-    // Необязательно: .csproj приложения, которое будет использовать результат.
-    // Нужен для определения допустимого синтаксиса C#; проект не изменяется.
+    // Optional: The .csproj file of the application that will use the result. 
+    // Used to determine the permissible C# syntax; the project itself is not modified.
     private const string DestinationProjectPath = "";
 
-    // Обновляются/удаляются только ранее созданные и не изменённые вручную файлы.
-    // При конфликте генератор остановится и сохранит существующие файлы.
+    // Only previously created files that have not been manually modified will be updated or deleted. 
+    // In the event of a conflict, the generator will stop and preserve the existing files.
     private const bool OverwriteGeneratedFiles = true;
     private const bool RemoveObsoleteGeneratedFiles = true;
 
-    // Необязательно: точные имена для отдельных объектов/свойств, например:
+    // Optional: specific names for individual objects/properties, for example:
     // new() { Kind = "Table", Schema = "dbo", Name = "Clients",
     //         ClassName = "Client", SetName = "Clients" }
     private static readonly ObjectNameOverride[] NameOverrides = Array.Empty<ObjectNameOverride>();
-    // ================== КОНЕЦ ВХОДНЫХ ПАРАМЕТРОВ ==================
+    // ================== END OF INPUT PARAMETERS ==================
 
     private static async Task<int> Main()
     {
