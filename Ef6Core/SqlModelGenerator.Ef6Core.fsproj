@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>SqlModelGenerator.Ef6Core</AssemblyName>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <LangVersion>8.0</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Domain.fs" />
+    <Compile Include="PocoGeneratorTypes.fs" />
+    <Compile Include="StandaloneSupport.fs" />
+    <Compile Include="SqlServerSchema.fs" />
+    <Compile Include="PocoCodeGeneration.fs" />
+    <Compile Include="PocoOutput.fs" />
+    <Compile Include="PocoExistingModel.fs" />
+    <Compile Include="Ef6Generator.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.5.0" />
+    <PackageReference Update="FSharp.Core" Version="10.0.101" />
+  </ItemGroup>
+</Project>

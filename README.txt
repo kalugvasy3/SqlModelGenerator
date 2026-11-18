@@ -1,42 +1,93 @@
-SqlModelGenerator
-=================
+SqlModelGenerator — SQL Server -> Entity Framework 6
+===================================================
 
-Purpose
--------
-.NET 8 console generator that reads SQL Server metadata and writes C# code files for:
-- tables (POCO classes)
-- views (POCO classes)
-- stored procedures (wrapper methods + result classes when first result set can be described)
-- DbContext
+Настройка и запуск
+-----------------
+Все входные параметры собраны в начале Program.cs, между комментариями
+«ВХОДНЫЕ ПАРАМЕТРЫ» и «КОНЕЦ ВХОДНЫХ ПАРАМЕТРОВ»:
 
-What to change first
---------------------
-1. Open Program.cs
-2. Replace ConnectionString with your real SQL Server connection string
-3. Run: dotnet restore
-4. Run: dotnet run
-   Optional environment variables: SQLMODELGENERATOR_CONNECTION_STRING and
-   SQLMODELGENERATOR_OUTPUT override the defaults in Program.cs.
+- ConnectionString: подключение SQL Server для чтения метаданных.
+  Исходное значение из этого проекта сохранено. В сгенерированный код оно
+  не записывается. Схема читается через SELECT; процедуры не выполняются.
+- OutputFolder: отдельная папка результата, по умолчанию Generated рядом
+  с исполняемым файлом. Для первого запуска новой версии выберите пустую
+  папку: старые файлы прежнего генератора автоматически не удаляются.
+- RootNamespace и ContextName: имена в сгенерированном C#-коде.
+- MetadataTimeoutSeconds, SchemaFilter и Include...: тайм-аут, схема и
+  категории объектов. Пустая схема означает все видимые пользовательские схемы.
+- ClassNaming и SetNaming: имена как в базе, единственное или множественное число.
+- NullableReferenceTypes: по умолчанию false для C# 7.3/.NET Framework 4.8.
+  Nullable value types (int?, DateTime? и т. п.) при этом сохраняются.
+- ExistingModelPath: необязательная папка или проект существующей модели EF6.
+  Позволяет сохранить имена классов, DbSet, свойств, навигаций, интерфейсы,
+  конструкторы, значения по умолчанию и публичные контракты процедур.
+  Для Миссури укажите здесь исходную модель, если требуется её совместимость.
+  Выходная папка должна находиться отдельно от исходной модели.
+- DestinationProjectPath: необязательный .csproj потребителя для проверки
+  допустимого синтаксиса C#. Проект потребителя не изменяется.
+- OverwriteGeneratedFiles и RemoveObsoleteGeneratedFiles: обновление и удаление
+  только ранее созданных и не изменённых вручную файлов этой выходной папки.
+- NameOverrides: необязательные точные имена классов, DbSet и свойств для
+  отдельных таблиц, представлений и процедур; пример находится в Program.cs.
 
-Output
-------
-Generated folder under the app output directory.
+Аргументы командной строки и переменные окружения не переопределяют этот блок.
 
-Important notes
----------------
-- The generator itself only needs Microsoft.Data.SqlClient.
-- The generated code targets .NET Framework 4.8, C# 7.3, and Entity Framework 6.
-  Install the EntityFramework 6.5.x NuGet package in the consuming application.
-  No Microsoft.EntityFrameworkCore package is needed.
-- The generated AppDbContext uses the connection string named AppDbContext by default.
-  Alternatively, pass a connection string or connection-string name to its constructor.
-- EF6 cannot map a table without a primary key. Such a table gets a POCO but no DbSet;
-  check Report.txt for the list. Views have Get<ViewName>ViewAsync read methods.
-- Procedure methods use System.Data.SqlClient and the context's SQL connection. They
-  materialize the first result set by ordinal, so unusual SQL column names also work.
-  OUTPUT parameters are sent to SQL Server but are not returned by the current API.
-- Procedures use sp_describe_first_result_set. If SQL Server cannot describe a procedure result shape,
-  the method is still generated, but as a non-query method returning Task<int>.
-- Multi-result-set procedures are not handled in this first version.
-- This version writes directly to its output directory. Generate into a separate folder
-  when comparing with an existing model; review files before replacing application code.
+Откройте SqlModelGenerator.sln и запустите C#-проект SqlModelGenerator либо:
+
+    dotnet restore SqlModelGenerator.sln
+    dotnet run --project SqlModelGenerator.csproj
+
+Для сборки консоли требуется .NET SDK 8 или новее. Внутренняя библиотека F#
+входит в solution и собирается автоматически; установки AnotherEdit не нужно.
+Ctrl+C отменяет чтение/генерацию, с освобождением подключений и reader.
+
+Что генерируется
+----------------
+Используется выделенная из AnotherEdit проверенная логика EF6:
+
+- POCO таблиц и представлений с точными именами и типами столбцов.
+- DbContext и fluent mappings: схема/таблица, составные PK, порядок колонок
+  ключа, identity, computed/rowversion, длины/MAX, precision/scale, nullability.
+- FK, ссылки на родителя и коллекции дочерних объектов, обязательные и
+  необязательные связи, составные FK и каскадное удаление.
+- EF6 one-to-one со shared primary key; ограничения EF6 для альтернативных
+  ключей, неподдерживаемых или невидимых связей отражаются в Report.txt.
+- Представления и таблицы без PK получают POCO и Query...(): DbRawSqlQuery<T>.
+  Фиктивный ключ для включения их в DbSet не придумывается.
+- Процедуры: Arguments/Outputs/Row DTO, command factory, sync/async wrappers,
+  возврат OUTPUT и return value после закрытия reader, все строки и result sets.
+  DataSet-путь сохраняет также пустые result sets и неоднозначные имена колонок.
+- Report.txt с количеством объектов/связей и предупреждениями метаданных.
+
+Генератор не добавляет EF Core, миграции EF6 -> EF Core, TypeScript или UI.
+Функции базы не получают новые wrappers; существующие методы могут сохраняться
+в режиме ExistingModelPath как часть контракта исходной модели.
+
+Использование результата
+-----------------------
+По умолчанию результат рассчитан на .NET Framework 4.8, C# 7.3 и EF6.
+В приложении-потребителе нужен EntityFramework 6.x, System.Configuration,
+System.ComponentModel.DataAnnotations и обычный System.Data.SqlClient.
+Сам генератор использует Microsoft.Data.SqlClient только для метаданных.
+
+Контекст отключает создание/инициализацию базы. Доступны конструкторы с
+настроенным именованным подключением и с переданным DbConnection. Именованное
+подключение в App.config/Web.config должно соответствовать ContextName и иметь
+providerName="System.Data.SqlClient". Реальную строку подключения задаёт приложение.
+
+Обновление файлов
+----------------
+Запись использует атомарный publisher и .anotheredit-poco.json — manifest
+владения, совместимый с исходным ядром. Не удаляйте manifest между генерациями.
+Изменённый вручную файл не перезаписывается; исходная ExistingModelPath читается
+как образец и не изменяется. Старые неучтённые C#-файлы от предыдущей версии
+не смешиваются с новой моделью: выберите для результата отдельную пустую папку.
+
+Происхождение ядра
+-----------------
+Ef6Core содержит EF6-ветку PocoCodeGeneration, совместимое обновление
+PocoExistingModel, атомарный PocoOutput и SQL Server-запросы PocoSchema/
+SqlRelationships из AnotherEdit. Это самостоятельная библиотека без ссылки
+на проект, сборки, интерфейс или установку AnotherEdit. Проверка сравнивает
+генерацию с оригиналом, компилирует вывод с настоящим EF6 под C# 7.3 и проверяет
+runtime процедур на собственном тестовом ADO.NET-провайдере.
