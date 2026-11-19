@@ -11,21 +11,21 @@ internal static class Program
     // SQL Server connection for reading the schema. The existing value has been preserved. 
     // The generator does not execute procedures or modify data in the database.
     private const string ConnectionString = @"
-            Data Source=localhost;
-            Initial Catalog = OregonLC; 
-            MultipleActiveResultSets=True;
-            Encrypt=false;
-            TrustServerCertificate=true;
-            Integrated Security = True;
-            Transaction Binding = Explicit Unbind;";
+                    Data Source=localhost;
+                    Initial Catalog = SS_Alternatives;
+                    Integrated Security = True;
+                    TrustServerCertificate=True;
+                    Transaction Binding = Explicit Unbind;";
 
     // A separate folder for the result. Replace with a full path if necessary. 
     // Do not place an existing model from the project here; there is a field below for that.
-    private static readonly string OutputFolder = Path.Combine(AppContext.BaseDirectory, "Generated");
+    private static readonly string OutputFolder = Path.Combine(Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, @"..\..\..\..\..")), 
+                                                               "AlternativesToAbortion\\AlternativesToAbortionWeb", 
+                                                               "Generated");
 
     // Namespace and DbContext names in the generated EF6 C# code.
-    private const string RootNamespace = "GeneratedModel";
-    private const string ContextName = "AppDbContext";
+    private const string RootNamespace = "OA_AlternativesEntities";
+    private const string ContextName = "dbContext"; //"AppDbContext";
 
     // Timeout for each metadata request, in seconds. Empty filter = all schemas.
     private const int MetadataTimeoutSeconds = 120;
